@@ -1,14 +1,12 @@
 from fastapi import APIRouter
 from app.services.fyers_service import fetch_historical_data
+from app.services.data_service import convert_to_dataframe
 
 router = APIRouter()
 
-@router.get("/")
-def home():
-    return {"message": "Trading AI Running 🚀"}
-
-
 @router.get("/data")
 def get_data():
-    data = fetch_historical_data()
-    return data
+    raw = fetch_historical_data()
+    df = convert_to_dataframe(raw)
+
+    return df.tail(10).to_dict()

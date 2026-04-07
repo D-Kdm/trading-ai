@@ -1,16 +1,14 @@
 from fyers_apiv3 import fyersModel
 from config import FYERS_CLIENT_ID
 
+ACCESS_TOKEN = "PASTE_YOUR_TOKEN_HERE"
+
 def get_fyers_client():
-    # NOTE: You will need access_token (manual step first time)
-    access_token = "YOUR_ACCESS_TOKEN"
-    
-    fyers = fyersModel.FyersModel(
+    return fyersModel.FyersModel(
         client_id=FYERS_CLIENT_ID,
-        token=access_token,
+        token=ACCESS_TOKEN,
         log_path=""
     )
-    return fyers
 
 
 def fetch_historical_data(symbol="NSE:RELIANCE-EQ"):
@@ -25,5 +23,4 @@ def fetch_historical_data(symbol="NSE:RELIANCE-EQ"):
         "cont_flag": "1"
     }
 
-    response = fyers.history(data)
-    return response
+    return fyers.history(data)
