@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trading AI · Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="glow"></div>
+
+  <!-- ===== Header ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 17 9 11 13 15 21 7"></polyline>
+          <polyline points="15 7 21 7 21 13"></polyline>
+        </svg>
+      </div>
+      <div>
+        <h1>Trading <span class="grad">AI</span></h1>
+        <p>Machine-learning signals for NSE stocks</p>
+      </div>
+    </div>
+
+    <nav class="symbols" id="symbols"></nav>
+
+    <div class="top-actions">
+      <span class="badge" id="sourceBadge"><span class="dot"></span><span id="sourceText">Loading…</span></span>
+      <button class="icon-btn" id="refreshBtn" title="Refresh data" aria-label="Refresh data">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ===== KPI cards ===== -->
+    <section class="kpis">
+      <article class="card kpi">
+        <div class="kpi-label">Last price</div>
+        <div class="kpi-value mono" id="lastPrice">—</div>
+        <div class="kpi-sub" id="priceChange">—</div>
+      </article>
+
+      <article class="card kpi">
+        <div class="kpi-label">Rule-based signal <span class="hint">MA 10 / MA 20 trend</span></div>
+        <div class="kpi-value" id="ruleSignal">—</div>
+        <div class="kpi-sub" id="ruleReason">—</div>
+      </article>
+
+      <article class="card kpi ai-kpi">
+        <div class="kpi-label">AI prediction <span class="hint">next 5-min candle</span></div>
+        <div class="kpi-value" id="aiPrediction">—</div>
+        <div class="meter" aria-hidden="true">
+          <div class="meter-fill" id="aiMeter"></div>
+          <div class="meter-mid"></div>
+        </div>
+        <div class="kpi-sub" id="aiProb">—</div>
+      </article>
+
+      <article class="card kpi">
+        <div class="kpi-label">Model accuracy <span class="hint">on unseen data</span></div>
+        <div class="kpi-value mono" id="accuracy">—</div>
+        <div class="kpi-sub" id="accuracySub">—</div>
+      </article>
+    </section>
+
+    <!-- ===== Chart + side panel ===== -->
+    <section class="main-grid">
+      <article class="card chart-card">
+        <div class="card-head">
+          <div>
+            <h2 id="chartTitle">Price chart</h2>
+            <div class="ohlc mono" id="ohlc"></div>
+          </div>
+          <div class="legend">
+            <span><i class="swatch line ma10"></i>MA 10</span>
+            <span><i class="swatch line ma20"></i>MA 20</span>
+            <span><i class="arrow up">▲</i>Buy</span>
+            <span><i class="arrow down">▼</i>Sell</span>
+          </div>
+        </div>
+        <div id="chart" class="chart"></div>
+      </article>
+
+      <aside class="side">
+        <article class="card">
+          <div class="card-head">
+            <h2>AI model</h2>
+            <span class="pill subtle">Random Forest</span>
+          </div>
+          <p class="muted small" id="modelMeta">Not trained yet.</p>
+          <button class="btn-primary" id="trainBtn">
+            <span class="btn-label">Train model</span>
+            <span class="spinner" hidden></span>
+          </button>
+
+          <h3 class="section-title">What the AI looks at</h3>
+          <div id="importance" class="importance">
+            <p class="muted small">Train the model to see which features matter most.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>How it works</h2>
+          <ol class="steps">
+            <li><b>Fetch</b><span>5-minute candles from Fyers</span></li>
+            <li><b>Features</b><span>returns, moving averages, volatility, momentum</span></li>
+            <li><b>Rules</b><span>trend signal from MA 10 vs MA 20</span></li>
+            <li><b>AI</b><span>Random Forest predicts the next candle's direction</span></li>
+          </ol>
+        </article>
+      </aside>
+    </section>
+
+    <!-- ===== Recent candles table ===== -->
+    <section class="card">
+      <div class="card-head">
+        <h2>Recent candles</h2>
+        <span class="muted small" id="updatedAt"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th><th>Close</th><th>Change</th><th>MA 10</th><th>MA 20</th>
+              <th>Volatility</th><th>Volume</th><th>Signal</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="footer">
+      Educational project — not financial advice. Built with FastAPI, scikit-learn and Fyers API.
+    </footer>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,26 +1,40 @@
+from datetime import date, timedelta
 from fyers_apiv3 import fyersModel
-from config import FYERS_CLIENT_ID
+from config import FYERS_CLIENT_ID, FYERS_ACCESS_TOKEN
 
-ACCESS_TOKEN = "PASTE_YOUR_TOKEN_HERE"
+
+class FyersError(Exception):
+    """Raised when Fyers refuses a request (bad token, wrong symbol, ...)."""
+
 
 def get_fyers_client():
     return fyersModel.FyersModel(
         client_id=FYERS_CLIENT_ID,
-        token=ACCESS_TOKEN,
+        token=FYERS_ACCESS_TOKEN,
         log_path=""
     )
 
 
-def fetch_historical_data(symbol="NSE:RELIANCE-EQ"):
+def fetch_historical_data(symbol="NSE:RELIANCE-EQ", days=30):
+    if not FYERS_ACCESS_TOKEN:
+        raise FyersError("No FYERS_ACCESS_TOKEN in .env")
+
     fyers = get_fyers_client()
 
     data = {
         "symbol": symbol,
-        "resolution": "5",
-        "date_format": "1",
-        "range_from": "2024-03-01",
-        "range_to": "2024-03-10",
+        "resolution": "5",                  # 5-minute candles
+        "date_format": "1",                 # dates as yyyy-mm-dd
+        "range_from": (date.today() - timedelta(days=days)).isoformat(),
+        "range_to": date.today().isoformat(),
         "cont_flag": "1"
     }
 
-    return fyers.history(data)
+    response = fyers.history(data)
+
+    # Fyers answers {"s": "ok", "candles": [...]} on success,
+    # or {"s": "error", "message": "..."} on failure
+    if response.get("s") != "ok" or not response.get("candles"):
+        raise FyersError(response.get("message", "No candles returned"))
+
+    return response
