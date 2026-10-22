@@ -7,13 +7,14 @@ The server must be running first:
     uvicorn main:app --reload
 Then run:
     python scripts/record_demo.py
-Output: media/trading-ai-demo.mp4  (1920x1080, ~40 seconds, no sound)
+Output: ~/Videos/trading-ai-demo.mp4  (1920x1080, ~40 seconds, no sound)
 
 How it works: Playwright drives your installed Chrome, Chrome streams a
 screenshot every time the page changes, and ffmpeg stitches them into an MP4.
 """
 import asyncio
 import base64
+import importlib.util
 import os
 import subprocess
 
@@ -22,7 +23,11 @@ from playwright.async_api import async_playwright
 
 URL = "http://127.0.0.1:8000/"
 W, H, FPS = 1920, 1080, 30
-OUT = os.path.join(os.path.dirname(__file__), "..", "media", "trading-ai-demo.mp4")
+OUT = os.path.join(os.path.expanduser("~"), "Videos", "trading-ai-demo.mp4")
+
+# Only mention the LSTM if PyTorch is installed (otherwise the app skips it)
+HAS_LSTM = importlib.util.find_spec("torch") is not None
+N_MODELS = 5 if HAS_LSTM else 4
 
 # Injected into the page: a visible cursor, a caption bar, and intro/outro cards
 OVERLAY_JS = """
@@ -78,18 +83,19 @@ OVERLAY_JS = """
 INTRO = """
   <h1>Trading <span>AI</span></h1>
   <p>An AI-powered trading dashboard I built for NSE stocks</p>
-  <div class="stack"><b>LightGBM</b><b>PyTorch LSTM</b><b>Optuna</b><b>FastAPI</b></div>
+  <div class="stack"><b>LightGBM</b>""" + ("<b>PyTorch LSTM</b>" if HAS_LSTM else "") + """<b>Optuna</b><b>FastAPI</b></div>
 """
-OUTRO = """
+OUTRO = f"""
   <h1>Trading <span>AI</span></h1>
-  <p>Features &rarr; 5 competing models &rarr; walk-forward validation &rarr; backtest</p>
-  <div class="stack"><b>Python</b><b>LightGBM</b><b>PyTorch</b><b>Optuna</b><b>FastAPI</b><b>Fyers API</b></div>
+  <p>Features &rarr; {N_MODELS} competing models &rarr; walk-forward validation &rarr; backtest</p>
+  <div class="stack"><b>Python</b><b>LightGBM</b>{"<b>PyTorch</b>" if HAS_LSTM else ""}<b>Optuna</b><b>FastAPI</b><b>Fyers API</b></div>
   <small>Educational project &mdash; not financial advice</small>
 """
 
 
 async def main():
     frames = []   # (timestamp in seconds, jpeg bytes)
+    cuts = []     # (start, end) stretches to remove from the video, e.g. waiting for training
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome", headless=True)
@@ -122,8 +128,7 @@ async def main():
             x, y = await center(selector)
             await mouse.move(x, y, steps=25)
             await wait(250)
-            await mouse.down(); await wait(90); await mouse.up()
-            await page.locator(selector).first.click()
+            await mouse.down(); await wait(90); await mouse.up()   # a real click at the cursor
 
         # --- Scene 1: intro card ---
         await mouse.move(W / 2, H / 2)
@@ -146,9 +151,14 @@ async def main():
             await wait(1300)
 
         # --- Scene 4: train the model ---
-        await caption("One click: Optuna tunes LightGBM, an LSTM trains, 5 models compete")
+        await caption("One click: Optuna tunes LightGBM" + (", an LSTM trains" if HAS_LSTM else "")
+                      + f", {N_MODELS} models compete")
         await click("#trainBtn")
+        await wait(1500)                                  # show the spinner briefly...
+        cut_start = frames[-1][0]
         await page.wait_for_selector("#toast:not([hidden])", timeout=300_000)
+        await wait(100)
+        cuts.append((cut_start, frames[-1][0] - 0.4))    # ...then skip the rest of the wait
         await wait(2400)
 
         # --- Scene 5: prediction + honest accuracy ---
@@ -182,13 +192,20 @@ async def main():
         await cdp.send("Page.stopScreencast")
         await browser.close()
 
-    write_video(frames)
+    write_video(frames, cuts)
 
 
-def write_video(frames):
+def write_video(frames, cuts=()):
     """Turn the screenshots (taken at uneven times) into a smooth 30 fps MP4."""
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     frames.sort(key=lambda f: f[0])
+
+    # Remove the cut stretches and shift everything after them earlier
+    for cut_start, cut_end in sorted(cuts, reverse=True):
+        gap = cut_end - cut_start
+        frames = [(t if t <= cut_start else t - gap, img) for t, img in frames
+                  if not cut_start < t < cut_end]
+
     start, end = frames[0][0], frames[-1][0]
 
     ffmpeg = subprocess.Popen(

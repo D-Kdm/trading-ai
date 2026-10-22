@@ -1,5 +1,8 @@
 from fastapi import APIRouter, HTTPException
-from app.services.market_service import get_market_data
+from fastapi.responses import RedirectResponse
+from app.services.fyers_auth import exchange_auth_code, login_url
+from app.services.fyers_service import FyersError
+from app.services.market_service import clear_cache, get_market_data
 from app.services.strategy_service import generate_signal
 from app.services.model_service import predict_latest, get_model_info
 from app.models.train_model import train_model
@@ -51,6 +54,28 @@ def backtest(symbol: str = DEFAULT_SYMBOL):
     if info is None:
         raise HTTPException(status_code=400, detail=f"No model for {symbol} yet. Call /train first.")
     return info["backtest"]
+
+
+@router.get("/fyers/login")
+def fyers_login():
+    # Step 1 of the daily Fyers login: send the browser to Fyers
+    try:
+        return RedirectResponse(login_url())
+    except FyersError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/fyers/callback")
+def fyers_callback(auth_code: str = None, s: str = None, message: str = None):
+    # Step 2: Fyers sends the browser back here with a one-time auth_code
+    if s != "ok" or not auth_code:
+        raise HTTPException(status_code=400, detail=f"Fyers login failed: {message or s or 'no auth_code'}")
+    try:
+        exchange_auth_code(auth_code)
+    except FyersError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    clear_cache()                      # drop demo data so live data loads now
+    return RedirectResponse("/?connected=1")
 
 
 @router.get("/api/dashboard")

@@ -324,9 +324,11 @@ function drawTable(candles) {
 
 function drawSource(src) {
   const badge = $("sourceBadge");
+  const live = src.type === "live";
   badge.className = `badge ${src.type}`;
-  $("sourceText").textContent = src.type === "live" ? "Live · Fyers" : "Demo data";
-  badge.title = src.type === "live" ? "Real market data from Fyers" : `Fyers not connected: ${src.detail}`;
+  $("sourceText").textContent = live ? "Live · Fyers" : "Demo data";
+  badge.title = live ? "Real market data from Fyers" : `Fyers not connected: ${src.detail}`;
+  $("connectBtn").hidden = live;
 }
 
 // ---------- Loading ----------
@@ -389,6 +391,11 @@ function toast(msg, isError = false) {
 renderSymbols();
 createCharts();
 $("refreshBtn").addEventListener("click", load);
+$("connectBtn").addEventListener("click", () => (location.href = "/fyers/login"));
+if (new URLSearchParams(location.search).has("connected")) {
+  toast("Fyers connected — loading live data");
+  history.replaceState(null, "", "/");
+}
 $("trainBtn").addEventListener("click", train);
 load();
 setInterval(load, 60_000);   // refresh every minute

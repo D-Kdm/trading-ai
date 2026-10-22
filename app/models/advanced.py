@@ -41,7 +41,7 @@ if TORCH_AVAILABLE:
             return self.head(self.dropout(last)).squeeze(-1)
 
 
-class LSTMClassifier(BaseEstimator, ClassifierMixin):
+class LSTMClassifier(ClassifierMixin, BaseEstimator):
     def __init__(self, window=30, hidden=32, epochs=15, lr=0.003, batch_size=64, random_state=42):
         self.window = window
         self.hidden = hidden
@@ -96,7 +96,7 @@ class LSTMClassifier(BaseEstimator, ClassifierMixin):
 # ======================================================================
 # Ensemble (soft voting)
 # ======================================================================
-class EnsembleClassifier(BaseEstimator, ClassifierMixin):
+class EnsembleClassifier(ClassifierMixin, BaseEstimator):
     def __init__(self, members=None):
         self.members = members
 

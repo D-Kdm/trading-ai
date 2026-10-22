@@ -11,6 +11,10 @@ from app.services.data_service import convert_to_dataframe, add_features
 _cache = {}   # symbol -> (time fetched, DataFrame, source)
 
 
+def clear_cache():
+    _cache.clear()
+
+
 def get_market_data(symbol):
     """Returns (features DataFrame, source info)."""
     cached = _cache.get(symbol)
