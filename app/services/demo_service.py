@@ -33,7 +33,7 @@ def market_timestamps(n):
     return times[-n:]
 
 
-def generate_demo_response(symbol="NSE:RELIANCE-EQ", n=600):
+def generate_demo_response(symbol="NSE:RELIANCE-EQ", n=3000):
     # Same symbol -> same seed -> same chart every time (nice for videos)
     rng = np.random.default_rng(sum(ord(c) for c in symbol))
     price = BASE_PRICES.get(symbol, 1000)
@@ -49,7 +49,7 @@ def generate_demo_response(symbol="NSE:RELIANCE-EQ", n=600):
 
         # Every 60 candles the "trend" changes, so the chart has up and down phases
         if i % 60 == 0:
-            drift = rng.normal(0, 0.0004)
+            drift = rng.normal(0, 0.00015)
 
         open_ = price
         close = open_ * (1 + rng.normal(drift, 0.0015))   # next price = small random move

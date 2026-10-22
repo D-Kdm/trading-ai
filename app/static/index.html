@@ -53,7 +53,7 @@
       </article>
 
       <article class="card kpi ai-kpi">
-        <div class="kpi-label">AI prediction <span class="hint">next 5-min candle</span></div>
+        <div class="kpi-label">AI signal <span class="hint" id="aiModelName">next 5-min candle</span></div>
         <div class="kpi-value" id="aiPrediction">—</div>
         <div class="meter" aria-hidden="true">
           <div class="meter-fill" id="aiMeter"></div>
@@ -78,28 +78,31 @@
             <div class="ohlc mono" id="ohlc"></div>
           </div>
           <div class="legend">
-            <span><i class="swatch line ma10"></i>MA 10</span>
-            <span><i class="swatch line ma20"></i>MA 20</span>
+            <button class="chip on" data-overlay="ma"><i class="swatch line ma10"></i>MA 10 <i class="swatch line ma20"></i>MA 20</button>
+            <button class="chip" data-overlay="bb"><i class="swatch line bb"></i>Bollinger</button>
             <span><i class="arrow up">▲</i>Buy</span>
             <span><i class="arrow down">▼</i>Sell</span>
           </div>
         </div>
         <div id="chart" class="chart"></div>
+        <div class="sub-head"><span>RSI 14</span><span class="muted mono" id="rsiValue"></span><span class="hint">above 70 overbought · below 30 oversold</span></div>
+        <div id="rsiChart" class="rsi-chart"></div>
       </article>
 
       <aside class="side">
         <article class="card">
           <div class="card-head">
             <h2>AI model</h2>
-            <span class="pill subtle">Random Forest</span>
+            <span class="pill subtle" id="bestModelPill">5 models compete</span>
           </div>
           <p class="muted small" id="modelMeta">Not trained yet.</p>
           <button class="btn-primary" id="trainBtn">
             <span class="btn-label">Train model</span>
             <span class="spinner" hidden></span>
           </button>
+          <p class="muted tiny" id="trainHint">Tunes LightGBM with Optuna, trains an LSTM, compares 5 models. Takes about a minute.</p>
 
-          <h3 class="section-title">What the AI looks at</h3>
+          <h3 class="section-title">What the AI relies on <span class="hint">permutation importance</span></h3>
           <div id="importance" class="importance">
             <p class="muted small">Train the model to see which features matter most.</p>
           </div>
@@ -109,12 +112,70 @@
           <h2>How it works</h2>
           <ol class="steps">
             <li><b>Fetch</b><span>5-minute candles from Fyers</span></li>
-            <li><b>Features</b><span>returns, moving averages, volatility, momentum</span></li>
-            <li><b>Rules</b><span>trend signal from MA 10 vs MA 20</span></li>
-            <li><b>AI</b><span>Random Forest predicts the next candle's direction</span></li>
+            <li><b>Features</b><span>RSI, MACD, Bollinger, ATR, volume, momentum</span></li>
+            <li><b>Tune</b><span>Optuna searches LightGBM settings</span></li>
+            <li><b>Compete</b><span>LR · Random Forest · LightGBM · LSTM · Ensemble, walk-forward validated</span></li>
+            <li><b>Backtest</b><span>best model vs rules vs buy &amp; hold, with costs</span></li>
           </ol>
         </article>
       </aside>
+    </section>
+
+    <!-- ===== Backtest ===== -->
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Backtest</h2>
+          <p class="muted small" id="backtestMeta">Train the model to backtest it on data it has never seen.</p>
+        </div>
+        <div class="legend" id="equityLegend">
+          <span><i class="swatch line s-ai"></i>AI strategy</span>
+          <span><i class="swatch line s-rules"></i>Rules</span>
+          <span><i class="swatch line s-hold dashed"></i>Buy &amp; hold</span>
+        </div>
+      </div>
+      <div class="backtest-grid">
+        <div>
+          <div class="ohlc mono" id="equityValues"></div>
+          <div id="equityChart" class="equity-chart"></div>
+        </div>
+        <div class="table-wrap">
+          <table class="stats">
+            <thead><tr><th></th><th>AI</th><th>Rules</th><th>Buy &amp; hold</th></tr></thead>
+            <tbody id="statsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Model lab ===== -->
+    <section class="lab-grid">
+      <article class="card">
+        <div class="card-head">
+          <div>
+            <h2>Model lab</h2>
+            <p class="muted small">Walk-forward = average over 5 train-on-past / test-on-next rounds. Holdout = the final 20% nobody saw.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="models">
+            <thead>
+              <tr><th>Model</th><th>Walk-forward AUC</th><th>Holdout AUC</th><th>Accuracy</th><th>Precision</th><th>Recall</th></tr>
+            </thead>
+            <tbody id="modelsBody"><tr><td colspan="6" class="muted">Train the model to compare.</td></tr></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <h2>Confusion matrix <span class="hint">holdout</span></h2>
+        <div class="confusion" id="confusion"><p class="muted small">—</p></div>
+      </article>
+
+      <article class="card">
+        <h2>Optuna tuning <span class="hint">LightGBM</span></h2>
+        <div id="tuning" class="tuning"><p class="muted small">—</p></div>
+      </article>
     </section>
 
     <!-- ===== Recent candles table ===== -->
@@ -128,7 +189,7 @@
           <thead>
             <tr>
               <th>Time</th><th>Close</th><th>Change</th><th>MA 10</th><th>MA 20</th>
-              <th>Volatility</th><th>Volume</th><th>Signal</th>
+              <th>RSI</th><th>Volatility</th><th>Volume</th><th>Signal</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
@@ -137,7 +198,7 @@
     </section>
 
     <footer class="footer">
-      Educational project — not financial advice. Built with FastAPI, scikit-learn and Fyers API.
+      Educational project — not financial advice. Built with FastAPI, scikit-learn, LightGBM, Optuna, PyTorch and Fyers API.
     </footer>
   </main>
 

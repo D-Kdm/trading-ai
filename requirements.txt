@@ -3,6 +3,10 @@ uvicorn
 pandas
 numpy
 scikit-learn
+lightgbm
+optuna
 fyers-apiv3
 python-dotenv
 joblib
+# PyTorch (LSTM model) is optional - the app skips the LSTM without it.
+# Smaller CPU-only build:  pip install torch --index-url https://download.pytorch.org/whl/cpu

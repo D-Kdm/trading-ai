@@ -1,6 +1,6 @@
 from datetime import date, timedelta
 from fyers_apiv3 import fyersModel
-from config import FYERS_CLIENT_ID, FYERS_ACCESS_TOKEN
+from config import FYERS_CLIENT_ID, FYERS_ACCESS_TOKEN, HISTORY_DAYS
 
 
 class FyersError(Exception):
@@ -15,7 +15,7 @@ def get_fyers_client():
     )
 
 
-def fetch_historical_data(symbol="NSE:RELIANCE-EQ", days=30):
+def fetch_historical_data(symbol="NSE:RELIANCE-EQ", days=HISTORY_DAYS):
     if not FYERS_ACCESS_TOKEN:
         raise FyersError("No FYERS_ACCESS_TOKEN in .env")
 

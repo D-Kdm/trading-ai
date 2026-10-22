@@ -33,4 +33,4 @@ print("STEP 5: train AI model")
 print(" ", train_model(df), "\n")
 
 print("STEP 6: AI prediction for the next candle")
-print(" ", predict_latest(df))
+print(" ", predict_latest(df, "NSE:RELIANCE-EQ"))

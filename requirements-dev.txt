@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest
+# for scripts/record_demo.py
+playwright
+imageio-ffmpeg

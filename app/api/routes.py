@@ -29,19 +29,28 @@ def get_signal(symbol: str = DEFAULT_SYMBOL):
 
 @router.post("/train")
 def train(symbol: str = DEFAULT_SYMBOL):
-    # Fetch data -> build features -> train the AI model and save it
+    # Fetch data -> build features -> compare models, backtest, save the best
     df, _ = get_market_data(symbol)
     return train_model(df, symbol)
 
 
 @router.get("/predict")
 def predict(symbol: str = DEFAULT_SYMBOL):
-    # Fetch latest data -> build features -> ask the trained model
+    # Fetch latest data -> build features -> ask this stock's trained model
     df, _ = get_market_data(symbol)
     try:
-        return predict_latest(df)
+        return predict_latest(df, symbol)
     except FileNotFoundError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/backtest")
+def backtest(symbol: str = DEFAULT_SYMBOL):
+    # Results of the backtest run during the last training
+    info = get_model_info(symbol)
+    if info is None:
+        raise HTTPException(status_code=400, detail=f"No model for {symbol} yet. Call /train first.")
+    return info["backtest"]
 
 
 @router.get("/api/dashboard")
@@ -57,15 +66,16 @@ def dashboard(symbol: str = DEFAULT_SYMBOL):
             "low": float(row.low), "close": float(row.close),
             "volume": float(row.volume),
             "ma_10": float(row.ma_10), "ma_20": float(row.ma_20),
+            "bb_upper": float(row.bb_upper), "bb_lower": float(row.bb_lower),
+            "rsi": float(row.rsi_14), "macd_hist": float(row.macd_hist),
             "returns": float(row.returns), "volatility": float(row.volatility),
-            "momentum": float(row.momentum),
             "signal": int(row.signal),
         }
         for row in df.itertuples()
     ]
 
     try:
-        ai = predict_latest(df)
+        ai = predict_latest(df, symbol)
     except FileNotFoundError:
         ai = None   # model not trained yet - the dashboard shows a "Train" prompt
 
@@ -74,5 +84,5 @@ def dashboard(symbol: str = DEFAULT_SYMBOL):
         "source": source,
         "candles": candles,
         "ai": ai,
-        "model": get_model_info(),
+        "model": get_model_info(symbol),
     }
