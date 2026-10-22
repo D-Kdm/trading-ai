@@ -7,7 +7,8 @@ The server must be running first:
     uvicorn main:app --reload
 Then run:
     python scripts/record_demo.py
-Output: ~/Videos/trading-ai-demo.mp4  (1920x1080, ~40 seconds, no sound)
+Output: ~/Videos/trading-ai-live-data.mp4  (or trading-ai-demo-data.mp4 when Fyers
+isn't connected) - 1920x1080, ~30 seconds, silent
 
 How it works: Playwright drives your installed Chrome, Chrome streams a
 screenshot every time the page changes, and ffmpeg stitches them into an MP4.
@@ -23,7 +24,8 @@ from playwright.async_api import async_playwright
 
 URL = "http://127.0.0.1:8000/"
 W, H, FPS = 1920, 1080, 30
-OUT = os.path.join(os.path.expanduser("~"), "Videos", "trading-ai-demo.mp4")
+VIDEOS_DIR = os.path.join(os.path.expanduser("~"), "Videos")
+OUT = None   # chosen once we know whether the dashboard shows live or demo data
 
 # Only mention the LSTM if PyTorch is installed (otherwise the app skips it)
 HAS_LSTM = importlib.util.find_spec("torch") is not None
@@ -100,8 +102,13 @@ async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch(channel="chrome", headless=True)
         page = await browser.new_page(viewport={"width": W, "height": H})
-        await page.goto(URL, wait_until="networkidle")
-        await page.wait_for_function("document.getElementById('lastPrice').textContent.includes('₹')")
+        await page.goto(URL, wait_until="load", timeout=120_000)
+        await page.wait_for_function("document.getElementById('lastPrice').textContent.includes('₹')",
+                                     timeout=120_000)
+
+        global OUT
+        live = "live" in (await page.get_attribute("#sourceBadge", "class"))
+        OUT = os.path.join(VIDEOS_DIR, f"trading-ai-{'live' if live else 'demo'}-data.mp4")
         await page.evaluate(OVERLAY_JS)
         await page.evaluate("html => demo.card(html)", INTRO)
         await page.wait_for_timeout(800)
@@ -153,12 +160,22 @@ async def main():
         # --- Scene 4: train the model ---
         await caption("One click: Optuna tunes LightGBM" + (", an LSTM trains" if HAS_LSTM else "")
                       + f", {N_MODELS} models compete")
-        await click("#trainBtn")
-        await wait(1500)                                  # show the spinner briefly...
-        cut_start = frames[-1][0]
-        await page.wait_for_selector("#toast:not([hidden])", timeout=300_000)
-        await wait(100)
-        cuts.append((cut_start, frames[-1][0] - 0.4))    # ...then skip the rest of the wait
+        # Let the page finish loading the last stock, so the button doesn't move under the cursor
+        await page.wait_for_function(
+            "document.getElementById('chartTitle').textContent.startsWith('RELIANCE')"
+            " && !document.body.classList.contains('loading')", timeout=120_000)
+        await wait(400)
+        async with page.expect_response(lambda r: "/train" in r.url, timeout=600_000) as trained:
+            await click("#trainBtn")
+            try:
+                await page.wait_for_selector("#trainBtn:disabled", timeout=1500)
+            except Exception:
+                await page.locator("#trainBtn").click()   # the cursor click missed - click directly
+            await wait(1000)                              # show the spinner briefly...
+            cut_start = frames[-1][0]
+        await trained.value
+        await wait(600)                                   # let the "model trained" toast appear
+        cuts.append((cut_start, frames[-1][0] - 0.5))    # ...then skip the rest of the wait
         await wait(2400)
 
         # --- Scene 5: prediction + honest accuracy ---
@@ -209,10 +226,13 @@ def write_video(frames, cuts=()):
     start, end = frames[0][0], frames[-1][0]
 
     ffmpeg = subprocess.Popen(
-        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error",
+        # Standard colour range + a silent audio track: LinkedIn/YouTube process these reliably
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-filter_threads", "1",
          "-f", "image2pipe", "-framerate", str(FPS), "-vcodec", "mjpeg", "-i", "-",
-         "-vf", f"scale={W}:{H}", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-         "-crf", "18", "-preset", "slow", "-movflags", "+faststart", OUT],
+         "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+         "-vf", f"scale={W}:{H}:in_range=full:out_range=tv,format=yuv420p",
+         "-c:v", "libx264", "-threads", "2", "-profile:v", "high", "-crf", "18", "-preset", "medium",
+         "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", OUT],
         stdin=subprocess.PIPE,
     )
     i = 0

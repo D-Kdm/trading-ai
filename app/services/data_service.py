@@ -9,6 +9,11 @@ def convert_to_dataframe(response):
         "timestamp", "open", "high", "low", "close", "volume"
     ])
 
+    # Fyers can return the same candle twice (e.g. today's candles) and not always in
+    # order. Duplicates would make the model see some candles twice, and the chart
+    # can't draw repeated times - so keep one copy of each, oldest first.
+    df = df.drop_duplicates(subset="timestamp", keep="last").sort_values("timestamp")
+
     df['datetime'] = pd.to_datetime(df['timestamp'], unit='s')
     df.set_index('datetime', inplace=True)
 

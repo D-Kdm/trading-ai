@@ -41,3 +41,14 @@ def test_demo_candles_are_valid_and_in_market_hours():
         ist = pd.Timestamp(t, unit="s", tz="UTC").tz_convert("Asia/Kolkata")
         assert ist.weekday() < 5
         assert (9, 15) <= (ist.hour, ist.minute) <= (15, 25)
+
+
+def test_duplicate_and_unordered_candles_are_cleaned():
+    raw = {"candles": [
+        [300, 1, 1, 1, 1, 10],
+        [0, 1, 1, 1, 1, 10],
+        [300, 2, 2, 2, 2, 20],     # same time again (newer copy)
+    ]}
+    df = convert_to_dataframe(raw)
+    assert df["timestamp"].tolist() == [0, 300]
+    assert df["close"].iloc[-1] == 2
